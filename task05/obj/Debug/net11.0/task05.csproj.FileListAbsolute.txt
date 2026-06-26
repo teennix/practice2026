@@ -1,0 +1,12 @@
+C:\Users\neteennix\Practice2026\practice2026\task05\bin\Debug\net11.0\task05.deps.json
+C:\Users\neteennix\Practice2026\practice2026\task05\bin\Debug\net11.0\task05.dll
+C:\Users\neteennix\Practice2026\practice2026\task05\bin\Debug\net11.0\task05.pdb
+C:\Users\neteennix\Practice2026\practice2026\task05\obj\Debug\net11.0\task05.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\neteennix\Practice2026\practice2026\task05\obj\Debug\net11.0\task05.AssemblyInfoInputs.cache
+C:\Users\neteennix\Practice2026\practice2026\task05\obj\Debug\net11.0\task05.AssemblyInfo.cs
+C:\Users\neteennix\Practice2026\practice2026\task05\obj\Debug\net11.0\task05.csproj.CoreCompileInputs.cache
+C:\Users\neteennix\Practice2026\practice2026\task05\obj\Debug\net11.0\task05.sourcelink.json
+C:\Users\neteennix\Practice2026\practice2026\task05\obj\Debug\net11.0\task05.dll
+C:\Users\neteennix\Practice2026\practice2026\task05\obj\Debug\net11.0\refint\task05.dll
+C:\Users\neteennix\Practice2026\practice2026\task05\obj\Debug\net11.0\task05.pdb
+C:\Users\neteennix\Practice2026\practice2026\task05\obj\Debug\net11.0\ref\task05.dll
