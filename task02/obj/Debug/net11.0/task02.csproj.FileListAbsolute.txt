@@ -1,0 +1,12 @@
+C:\Users\neteennix\Practice2026\practice2026\task02\bin\Debug\net11.0\task02.deps.json
+C:\Users\neteennix\Practice2026\practice2026\task02\bin\Debug\net11.0\task02.dll
+C:\Users\neteennix\Practice2026\practice2026\task02\bin\Debug\net11.0\task02.pdb
+C:\Users\neteennix\Practice2026\practice2026\task02\obj\Debug\net11.0\task02.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\neteennix\Practice2026\practice2026\task02\obj\Debug\net11.0\task02.AssemblyInfoInputs.cache
+C:\Users\neteennix\Practice2026\practice2026\task02\obj\Debug\net11.0\task02.AssemblyInfo.cs
+C:\Users\neteennix\Practice2026\practice2026\task02\obj\Debug\net11.0\task02.csproj.CoreCompileInputs.cache
+C:\Users\neteennix\Practice2026\practice2026\task02\obj\Debug\net11.0\task02.sourcelink.json
+C:\Users\neteennix\Practice2026\practice2026\task02\obj\Debug\net11.0\task02.dll
+C:\Users\neteennix\Practice2026\practice2026\task02\obj\Debug\net11.0\refint\task02.dll
+C:\Users\neteennix\Practice2026\practice2026\task02\obj\Debug\net11.0\task02.pdb
+C:\Users\neteennix\Practice2026\practice2026\task02\obj\Debug\net11.0\ref\task02.dll
