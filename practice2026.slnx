@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="PluginA/PluginA.csproj" />
+  <Project Path="PluginB/PluginB.csproj" />
+  <Project Path="PluginContracts/PluginContracts.csproj" />
+  <Project Path="PluginRunner/PluginRunner.csproj" />
+  <Project Path="task10tests/task10tests.csproj" />
+</Solution>
