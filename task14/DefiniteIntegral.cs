@@ -46,6 +46,23 @@ public class DefiniteIntegral
         return totalIntegral;
     }
 
+    public static double SolveSingleThread(double a, double b, Func<double, double> function, double step)
+    {
+        int stepsCount = (int)Math.Ceiling((b - a) / step);
+        if (stepsCount <= 0) return 0.0;
+
+        double h = (b - a) / stepsCount;
+        
+        double sum = (function(a) + function(b)) / 2.0;
+        
+        for (int j = 1; j < stepsCount; j++)
+        {
+            sum += function(a + j * h);
+        }
+        
+        return sum * h;
+    }
+
     private static void AddDouble(ref double location, double value)
     {
         double initialValue, computedValue;
