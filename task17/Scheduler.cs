@@ -4,18 +4,63 @@ namespace task17;
 
 public interface IScheduler
 {
-    bool HasCommand();
-    ICommand Select();
-    void Add(ICommand cmd);
+    bool HasTasks { get; }
+    void Add(ICommand command);
+    void Remove(ICommand command);
+    ICommand? Next();
 }
 
 public class RoundRobinScheduler : IScheduler
 {
-    private readonly Queue<ICommand> _queue = new();
+    private readonly List<ICommand> _tasks = new();
+    private int _currentIndex = 0;
+    private readonly object _lock = new object();
 
-    public bool HasCommand() => _queue.Count > 0;
+    public bool HasTasks
+    {
+        get
+        {
+            lock (_lock) return _tasks.Count > 0;
+        }
+    }
 
-    public ICommand Select() => _queue.Dequeue();
+    public void Add(ICommand command)
+    {
+        lock (_lock)
+        {
+            _tasks.Add(command);
+        }
+    }
 
-    public void Add(ICommand cmd) => _queue.Enqueue(cmd);
+    public void Remove(ICommand command)
+    {
+        lock (_lock)
+        {
+            int index = _tasks.IndexOf(command);
+            if (index != -1)
+            {
+                _tasks.RemoveAt(index);
+                if (_currentIndex >= _tasks.Count)
+                {
+                    _currentIndex = 0;
+                }
+                else if (index < _currentIndex)
+                {
+                    _currentIndex--;
+                }
+            }
+        }
+    }
+
+    public ICommand? Next()
+    {
+        lock (_lock)
+        {
+            if (_tasks.Count == 0) return null;
+
+            var cmd = _tasks[_currentIndex];
+            _currentIndex = (_currentIndex + 1) % _tasks.Count;
+            return cmd;
+        }
+    }
 }

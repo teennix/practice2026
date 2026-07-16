@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 
 namespace task17;
 
@@ -7,61 +8,46 @@ public interface ICommand
     void Execute();
 }
 
-public class ActionCommand : ICommand
+public interface IRepeatableCommand : ICommand
 {
-    private readonly Action _action;
-    public ActionCommand(Action action) => _action = action;
-    public void Execute() => _action();
+    bool IsCompleted { get; }
 }
 
-public class HardStopCommand : ICommand
+public class ActionCommand(Action action) : ICommand
 {
-    private readonly ServerThread _server;
-    public HardStopCommand(ServerThread server) => _server = server;
+    public void Execute() => action();
+}
+
+public class HardStopCommand(ServerThread server) : ICommand
+{
     public void Execute()
     {
-        if (Environment.CurrentManagedThreadId != _server.ThreadId)
-            throw new InvalidOperationException("Команда должна выполняться в потоке сервера.");
-        _server.RequestHardStop();
+        if (Thread.CurrentThread != server.Thread)
+            throw new InvalidOperationException("HardStop должен выполняться в потоке сервера!");
+        server.StopImmediate();
     }
 }
 
-public class SoftStopCommand : ICommand
+public class SoftStopCommand(ServerThread server) : ICommand
 {
-    private readonly ServerThread _server;
-    public SoftStopCommand(ServerThread server) => _server = server;
     public void Execute()
     {
-        if (Environment.CurrentManagedThreadId != _server.ThreadId)
-            throw new InvalidOperationException("Команда должна выполняться в потоке сервера.");
-        _server.RequestSoftStop();
+        if (Thread.CurrentThread != server.Thread)
+            throw new InvalidOperationException("SoftStop должен выполняться в потоке сервера!");
+        server.StopGraceful();
     }
 }
 
-public class LongRunningCommand : ICommand
+public class TestCommand(int id, int maxExecutions = 3, Action<int, int>? onStep = null) : IRepeatableCommand
 {
-    private readonly IScheduler _scheduler;
-    private int _remainingSteps;
-    private readonly Action _stepAction;
-
-    public LongRunningCommand(IScheduler scheduler, int steps, Action stepAction)
-    {
-        _scheduler = scheduler;
-        _remainingSteps = steps;
-        _stepAction = stepAction;
-    }
+    private int _counter = 0;
+    public bool IsCompleted => _counter >= maxExecutions;
+    public int Id => id;
 
     public void Execute()
     {
-        if (_remainingSteps > 0)
-        {
-            _stepAction();
-            _remainingSteps--;
-
-            if (_remainingSteps > 0)
-            {
-                _scheduler.Add(this);
-            }
-        }
+        _counter++;
+        Console.WriteLine($"Поток {id} вызов {_counter}");
+        onStep?.Invoke(id, _counter);
     }
 }

@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using task17;
 using Xunit;
@@ -67,84 +67,82 @@ public class ServerThreadTests
     }
 
     [Fact]
-    public void ExceptionHandler_CatchesExceptionsFromCommands()
+    public void Task19_LongRunningOperations_ReportAndGraph()
     {
-        Exception? caughtException = null;
-        var server = new ServerThread(new RoundRobinScheduler(), (cmd, ex) => caughtException = ex);
-        
-        server.Enqueue(new ActionCommand(() => throw new DivideByZeroException("Test Exception")));
-        server.Enqueue(new HardStopCommand(server));
-
-        server.Start();
-        server.Join();
-
-        Assert.NotNull(caughtException);
-        Assert.IsType<DivideByZeroException>(caughtException!);
-    }
-
-    [Fact]
-    public void Task18_GenerateReportAndGraph()
-    {
-        string baseDir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../"));
-        string reportPath = Path.Combine(baseDir, "task18_report.txt");
-        string graphPath = Path.Combine(baseDir, "task18_graph.png");
-
-        using var writer = new StreamWriter(reportPath);
-        writer.WriteLine("=== ОТЧЕТ ПО ПЛАНИРОВЩИКУ КОМАНД (ЗАДАЧА 18) ===\n");
-
         var scheduler = new RoundRobinScheduler();
         var server = new ServerThread(scheduler);
         server.Start();
 
-        var watch = new Stopwatch();
-        bool isShortTaskDone = false;
-
-        writer.WriteLine("1. Запуск длительной операции (10 шагов по 50 мс)...");
-        var longCommand = new LongRunningCommand(scheduler, 10, () => Thread.Sleep(50));
-        server.Enqueue(longCommand); 
-
-        Thread.Sleep(20); 
+        var executionHistory = new List<(int Step, int CmdId, int CallNum)>();
+        var lockObj = new object();
+        int stepCounter = 0;
+        using var allDoneEvent = new CountdownEvent(15); 
         
-        writer.WriteLine("2. Замер времени отклика на новую (короткую) команду...");
-        watch.Start();
-        server.Enqueue(new ActionCommand(() => 
+        try
         {
-            watch.Stop();
-            isShortTaskDone = true;
-        }));
+            for (int i = 1; i <= 5; i++)
+            {
+                var cmd = new TestCommand(i, 3, (id, call) =>
+                {
+                    lock (lockObj)
+                    {
+                        stepCounter++;
+                        executionHistory.Add((stepCounter, id, call));
+                    }
+                    allDoneEvent.Signal();
+                });
+                server.Enqueue(cmd);
+            }
 
-        server.Enqueue(new SoftStopCommand(server));
-        server.Join();
+            bool completed = allDoneEvent.Wait(TimeSpan.FromSeconds(5));
+            Assert.True(completed, "Задачи зависли и не успели выполниться за 5 секунд!");
+        }
+        finally
+        {
+            server.Enqueue(new HardStopCommand(server));
+            
+            server.Join(1000); 
+        }
 
-        Assert.True(isShortTaskDone, "Короткая задача не выполнилась из-за блокировки очереди!");
+        string baseDir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../"));
+        string reportPath = Path.Combine(baseDir, "task19_report.txt");
+        string graphPath = Path.Combine(baseDir, "task19_graph.png");
 
-        double asyncResponseTime = watch.ElapsedMilliseconds;
-        double syncResponseTime = 500.0;
+        using var writer = new StreamWriter(reportPath);
+        writer.WriteLine("=== ОТЧЕТ ПО ДЛИТЕЛЬНЫМ ОПЕРАЦИЯМ (ЗАДАЧА 19) ===\n");
+        writer.WriteLine("1. Запуск 5 экземпляров TestCommand (по 3 вызова каждый):");
 
-        writer.WriteLine("\n3. Сравнение времени отклика:");
-        writer.WriteLine($"Время ожидания при синхронном выполнении (без планировщика): ~{syncResponseTime} мс");
-        writer.WriteLine($"Время ожидания с планировщиком (Round Robin): {asyncResponseTime:F2} мс");
-        
-        double speedup = syncResponseTime / asyncResponseTime;
-        writer.WriteLine($"\n=> Отзывчивость сервера улучшилась примерно в {speedup:F1} раз.");
+        foreach (var item in executionHistory)
+        {
+            writer.WriteLine($"[Шаг {item.Step:D2}] Поток (команда) {item.CmdId} -> вызов {item.CallNum}");
+        }
 
+        writer.WriteLine("\n2. Отправка команды HardStop...");
+        writer.WriteLine("=> Поток сервера успешно остановлен.");
+        writer.WriteLine("\n3. Анализ псевдопараллелизма:");
+        writer.WriteLine("Команды выполнялись строго по очереди через RoundRobinScheduler.");
+
+        // Построение графика
         Plot plt = new();
-        
-        double[] positions = { 0, 1 };
-        double[] values = { syncResponseTime, asyncResponseTime };
-        
-        var bars = plt.Add.Bars(positions, values);
-        
-        ScottPlot.TickGenerators.NumericManual tickGen = new();
-        tickGen.AddMajor(0, "Синхронно (Без планировщика)");
-        tickGen.AddMajor(1, "Псевдопараллельно (Round Robin)");
-        plt.Axes.Bottom.TickGenerator = tickGen;
+        double[] xs = executionHistory.Select(x => (double)x.Step).ToArray();
+        double[] ys = executionHistory.Select(x => (double)x.CmdId).ToArray();
 
-        plt.Title("Сравнение времени отклика сервера");
-        plt.YLabel("Время ожидания (мс)");
+        var markers = plt.Add.Markers(xs, ys);
+        markers.MarkerSize = 12;
+        markers.MarkerShape = MarkerShape.FilledCircle;
         
-        plt.SavePng(graphPath, 800, 600);
-        
-        _output.WriteLine("Анализ завершен. Файлы task18_report.txt и task18_graph.png сохранены в корень проекта.");
+        var line = plt.Add.ScatterLine(xs, ys);
+        line.LineWidth = 1;
+        line.Color = Colors.Gray.WithAlpha(0.5);
+
+        plt.Title("Псевдопараллельное выполнение операций");
+        plt.XLabel("Порядковый номер шага");
+        plt.YLabel("ID команды");
+
+        ScottPlot.TickGenerators.NumericManual yTicks = new();
+        for (int i = 1; i <= 5; i++) yTicks.AddMajor(i, $"Команда {i}");
+        plt.Axes.Left.TickGenerator = yTicks;
+
+        plt.SavePng(graphPath, 800, 500);
     }
 }

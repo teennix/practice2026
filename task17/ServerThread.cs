@@ -6,92 +6,87 @@ namespace task17;
 
 public class ServerThread
 {
-    private readonly BlockingCollection<ICommand> _queue;
+    private readonly BlockingCollection<ICommand> _queue = new();
     private readonly IScheduler _scheduler;
-    private Thread? _thread;
     private readonly Action<ICommand, Exception>? _exceptionHandler;
-    private volatile bool _isHardStopRequested;
+    
+    private Thread? _thread;
+    private volatile bool _isRunning;
+    private volatile bool _softStop;
 
-    public int ThreadId => _thread?.ManagedThreadId ?? -1;
+    public Thread? Thread => _thread;
 
     public ServerThread(IScheduler scheduler, Action<ICommand, Exception>? exceptionHandler = null)
     {
-        _scheduler = scheduler ?? throw new ArgumentNullException(nameof(scheduler));
-        _queue = new BlockingCollection<ICommand>();
+        _scheduler = scheduler;
         _exceptionHandler = exceptionHandler;
     }
 
     public void Start()
     {
-        if (_thread != null) throw new InvalidOperationException("Поток уже запущен.");
-        _thread = new Thread(ProcessCommands) { IsBackground = true };
+        _isRunning = true;
+        _softStop = false;
+        _thread = new Thread(Loop) { IsBackground = true };
         _thread.Start();
     }
 
-    public void Enqueue(ICommand command)
+    public void Enqueue(ICommand command) => _queue.Add(command);
+
+    public void StopImmediate() => _isRunning = false;
+
+    public void StopGraceful() => _softStop = true;
+
+    public bool Join(int timeout = Timeout.Infinite) => _thread?.Join(timeout) ?? true;
+
+    private void Loop()
     {
-        if (!_queue.IsAddingCompleted)
+        while (_isRunning)
         {
-            try { _queue.Add(command); }
-            catch (InvalidOperationException) { /* Очередь закрыта */ }
-        }
-    }
-
-    internal void RequestHardStop()
-    {
-        _isHardStopRequested = true;
-        _queue.CompleteAdding();
-    }
-
-    internal void RequestSoftStop()
-    {
-        _queue.CompleteAdding();
-    }
-
-    private void ProcessCommands()
-    {
-        try
-        {
-            while (!_isHardStopRequested)
+            ICommand? currentCmd = null;
+            try
             {
-                int timeout = _scheduler.HasCommand() ? 0 : Timeout.Infinite;
-
-                bool gotNewCommand = false;
-                try
+                if (_softStop && _queue.Count == 0 && !_scheduler.HasTasks)
                 {
-                    gotNewCommand = _queue.TryTake(out ICommand? cmd, timeout);
-                    if (gotNewCommand && cmd != null)
-                    {
-                        ExecuteSafe(cmd);
-                    }
-                }
-                catch (InvalidOperationException) { /* SoftStop вызван */ }
-
-                if (!gotNewCommand && _scheduler.HasCommand())
-                {
-                    ExecuteSafe(_scheduler.Select());
-                }
-
-                if (_queue.IsCompleted && !_scheduler.HasCommand() && _queue.Count == 0)
-                {
+                    _isRunning = false;
                     break;
                 }
+
+                int timeout = _scheduler.HasTasks ? 10 : Timeout.Infinite;
+
+                if (_queue.TryTake(out currentCmd, timeout))
+                {
+                    if (currentCmd is IRepeatableCommand repeatable)
+                    {
+                        _scheduler.Add(repeatable);
+                    }
+                    else
+                    {
+                        currentCmd.Execute();
+                    }
+                }
+
+                var scheduledCmd = _scheduler.Next();
+                if (scheduledCmd != null)
+                {
+                    currentCmd = scheduledCmd; 
+                    try
+                    {
+                        scheduledCmd.Execute();
+                    }
+                    finally
+                    {
+                        if (scheduledCmd is IRepeatableCommand r && r.IsCompleted)
+                        {
+                            _scheduler.Remove(scheduledCmd);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                if (_exceptionHandler != null && currentCmd != null)
+                    _exceptionHandler(currentCmd, ex);
             }
         }
-        catch (ObjectDisposedException) { /* Ожидаемо при жесткой остановке */ }
     }
-
-    private void ExecuteSafe(ICommand command)
-    {
-        try
-        {
-            command.Execute();
-        }
-        catch (Exception ex)
-        {
-            _exceptionHandler?.Invoke(command, ex);
-        }
-    }
-
-    public void Join() => _thread?.Join();
 }
